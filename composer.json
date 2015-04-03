@@ -1,0 +1,20 @@
+{
+    "name": "hlacos/attachment5",
+    "description": "",
+    "authors": [
+        {
+            "name": "Heiszmann László",
+            "email": "heiszmann@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.4.0",
+        "illuminate/support": "5.0.*"
+    },
+    "autoload": {
+        "psr-0": {
+            "Hlacos\\Attachment5": "src/"
+        }
+    },
+    "minimum-stability": "stable"
+}
