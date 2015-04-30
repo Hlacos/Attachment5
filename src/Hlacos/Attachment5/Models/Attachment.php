@@ -100,7 +100,7 @@ class Attachment extends Eloquent {
     public function publicPath($size = null) {
         $publicPath = public_path().$this->publicFilename();
         if ($size) {
-            return str_replace('.'.$this->extension, '_'.$size.'x'.$size.'.'.$this->extension, $publicPath);
+            return str_replace('.'.$this->extension, '_'.$size.'.'.$this->extension, $publicPath);
         } else {
             return $publicPath;
         }
@@ -117,7 +117,7 @@ class Attachment extends Eloquent {
         $publicUrl = asset($this->publicFilename());
 
         if ($size) {
-            return str_replace('.'.$this->extension, '_'.$size.'x'.$size.'.'.$this->extension, $publicUrl);
+            return str_replace('.'.$this->extension, '_'.$size.'.'.$this->extension, $publicUrl);
         } else {
             return $publicUrl;
         }
@@ -141,30 +141,130 @@ class Attachment extends Eloquent {
     private function copySize($size) {
         list($width, $height) = getimagesize($this->publicPath());
 
-        if ($width >= $height) {
-            $newWidth = $size;
-            $newHeight = round(($newWidth / $width) * $height);
-        } else {
-            $newHeight = $size;
-            $newWidth = round(($newHeight / $height) * $width);
-        }
+        list($newWidth, $newHeight, $destinationX, $destinationY, $sourceX, $sourceY, $sourceWidth, $sourceHeight) = $this->calcSizes($size, $width, $height);
 
-        // Load
         $thumb = imagecreatetruecolor($newWidth, $newHeight);
 
         if ($this->extension == 'jpg') {
             $source = imagecreatefromjpeg($this->publicPath());
-            imagecopyresized($thumb, $source, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+            imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $newWidth, $newHeight, $sourceWidth, $sourceHeight);
             imagejpeg($thumb, $this->publicPath($size));
         } elseif ($this->extension == 'jpeg') {
             $source = imagecreatefromjpeg($this->publicPath());
-            imagecopyresized($thumb, $source, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+            imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $newWidth, $newHeight, $sourceWidth, $sourceHeight);
             imagejpeg($thumb, $this->publicPath($size));
         } elseif ($this->extension == 'png') {
             $source = imagecreatefrompng($this->publicPath());
-            imagecopyresized($thumb, $source, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+            imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $newWidth, $newHeight, $sourceWidth, $sourceHeight);
             imagepng($thumb, $this->publicPath($size));
         }
+    }
+
+    private function calcSizes($size, $width, $height) {
+        switch ($size) {
+            case (preg_match('/^([0-9]*)w$/i', $size, $matches) ? true : false) :
+                $newWidth = $matches[1];
+                return $this->resizeWidth($width, $height, $newWidth);
+                break;
+            case (preg_match('/^([0-9]*)h$/i', $size, $matches) ? true : false) :
+                $newHeight = $matches[1];
+                return $this->resizeHeight($width, $height, $newHeight);
+                break;
+            case (preg_match('/^([0-9]*)x([0-9]*)b$/i', $size, $matches) ? true : false) :
+                $newWidth = $matches[1];
+                $newHeight= $matches[2];
+                return $this->resizeBox($width, $height, $newWidth, $newHeight);
+                break;
+            case (preg_match('/^([0-9]*)x([0-9]*)c$/i', $size, $matches) ? true : false) :
+                $newWidth = $matches[1];
+                $newHeight= $matches[2];
+                return $this->cropBox($width, $height, $newWidth, $newHeight);
+                break;
+            default:
+                return $this->resizeBox($width, $height);
+                break;
+        }
+
+    }
+
+    private function resizeWidth($width, $height, $newWidth) {
+        $newHeight = round(($newWidth / $width) * $height);
+
+        return array(
+            $newWidth,
+            $newHeight,
+            0,
+            0,
+            0,
+            0,
+            $width,
+            $height
+        );
+    }
+
+    private function resizeHeight($width, $height, $newHeight) {
+        $newWidth = round(($newHeight / $height) * $width);
+
+        return array(
+            $newWidth,
+            $newHeight,
+            0,
+            0,
+            0,
+            0,
+            $width,
+            $height
+        );
+    }
+
+    private function cropBox($width, $height, $newWidth, $newHeight) {
+        if ($width / $height < $newWidth / $newHeight) {
+            $ratioHeight = round(($newWidth / $width) * $height);
+
+            $sourceX = 0;
+            $sourceY = round(($height - ($newHeight / ($newWidth / $width))) / 2);
+
+            $cropWidth = $width;
+            $cropHeight = round($newHeight / ($newWidth / $width));
+        } else {
+            $ratioWidth = round(($newHeight / $height) * $width);
+
+            $sourceX = round(($width - ($newWidth / ($newHeight / $height))) / 2);
+            $sourceY = 0;
+
+            $cropHeight = $height;
+            $cropWidth = round($newWidth / ($newHeight / $height));
+        }
+
+        return array(
+            $newWidth,
+            $newHeight,
+            0,
+            0,
+            $sourceX,
+            $sourceY,
+            $cropWidth,
+            $cropHeight
+        );
+    }
+
+    private function resizeBox($width, $height, $newWidth, $newHeight) {
+        if ($width / $height >= $newWidth / $newHeight) {
+            $newHeight = round(($newWidth / $width) * $height);
+        } else {
+            $newWidth = round(($newHeight / $height) * $width);
+        }
+
+        return array(
+            $newWidth,
+            $newHeight,
+            0,
+            0,
+            0,
+            0,
+            $width,
+            $height
+        );
     }
 
     public static function sanitize($string, $forceLowercase = false, $alpha = false) {
