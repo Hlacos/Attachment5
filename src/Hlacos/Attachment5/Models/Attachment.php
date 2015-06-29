@@ -73,7 +73,6 @@ class Attachment extends Eloquent {
         $this->filename = pathinfo($path, PATHINFO_FILENAME);
         $this->extension = pathinfo($path, PATHINFO_EXTENSION);
         $this->size = filesize($path);
-        var_dump($path);
         $this->file_type = mime_content_type($path);
     }
 
