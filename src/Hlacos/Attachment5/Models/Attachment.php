@@ -88,7 +88,12 @@ class Attachment extends Eloquent {
             mkdir(public_path().'/'.$this->basePath(), 0777, true);
         }
 
-        return rename($path, $this->publicPath());
+        if (copy($path, $this->publicPath())) {
+            unlink($path);
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -143,6 +148,11 @@ class Attachment extends Eloquent {
         list($newWidth, $newHeight, $destinationX, $destinationY, $sourceX, $sourceY, $sourceWidth, $sourceHeight) = $this->calcSizes($size, $width, $height);
 
         $thumb = imagecreatetruecolor($newWidth, $newHeight);
+
+        imagealphablending($thumb, false);
+        imagesavealpha($thumb, true);
+        $transparent = imagecolorallocatealpha($thumb, 255, 255, 255, 127);
+        imagefilledrectangle($thumb, 0, 0, $newWidth, $newHeight, $transparent);
 
         if ($this->extension == 'jpg') {
             $source = imagecreatefromjpeg($this->publicPath());
