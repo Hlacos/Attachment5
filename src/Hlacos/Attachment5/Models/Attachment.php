@@ -145,7 +145,7 @@ class Attachment extends Eloquent {
     private function copySize($size) {
         list($width, $height) = getimagesize($this->publicPath());
 
-        list($newWidth, $newHeight, $destinationX, $destinationY, $sourceX, $sourceY, $sourceWidth, $sourceHeight) = $this->calcSizes($size, $width, $height);
+        list($newWidth, $newHeight, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight) = $this->calcSizes($size, $width, $height);
 
         $thumb = imagecreatetruecolor($newWidth, $newHeight);
 
@@ -156,15 +156,15 @@ class Attachment extends Eloquent {
 
         if ($this->extension == 'jpg') {
             $source = imagecreatefromjpeg($this->publicPath());
-            imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $newWidth, $newHeight, $sourceWidth, $sourceHeight);
+            imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
             imagejpeg($thumb, $this->publicPath($size));
         } elseif ($this->extension == 'jpeg') {
             $source = imagecreatefromjpeg($this->publicPath());
-            imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $newWidth, $newHeight, $sourceWidth, $sourceHeight);
+            imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
             imagejpeg($thumb, $this->publicPath($size));
         } elseif ($this->extension == 'png') {
             $source = imagecreatefrompng($this->publicPath());
-            imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $newWidth, $newHeight, $sourceWidth, $sourceHeight);
+            imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
             imagepng($thumb, $this->publicPath($size));
         }
     }
@@ -189,6 +189,11 @@ class Attachment extends Eloquent {
                 $newHeight= $matches[2];
                 return $this->cropBox($width, $height, $newWidth, $newHeight);
                 break;
+            case (preg_match('/^([0-9]*)x([0-9]*)e$/i', $size, $matches) ? true : false) :
+                $newWidth = $matches[1];
+                $newHeight= $matches[2];
+                return $this->expandBox($width, $height, $newWidth, $newHeight);
+                break;
             default:
                 return $this->resizeBox($width, $height);
                 break;
@@ -206,6 +211,8 @@ class Attachment extends Eloquent {
             0,
             0,
             0,
+            $newWidth,
+            $newHeight,
             $width,
             $height
         );
@@ -221,6 +228,8 @@ class Attachment extends Eloquent {
             0,
             0,
             0,
+            $newWidth,
+            $newHeight,
             $width,
             $height
         );
@@ -252,8 +261,39 @@ class Attachment extends Eloquent {
             0,
             $sourceX,
             $sourceY,
+            $newWidth,
+            $newHeight,
             $cropWidth,
             $cropHeight
+        );
+    }
+
+    private function expandBox($width, $height, $newWidth, $newHeight) {
+        if ($width / $height < $newWidth / $newHeight) {
+            $containWidth = round($width * ($newHeight / $height));
+            $containHeight = $newHeight;
+
+            $destinationX = round(($newWidth - $containWidth) / 2);
+            $destinationY = 0;
+        } else {
+            $containWidth = $newWidth;
+            $containHeight = round($height * ($newWidth / $width));
+
+            $destinationX = 0;
+            $destinationY = round(($newHeight - $containHeight) / 2);
+        }
+
+        return array(
+            $newWidth,
+            $newHeight,
+            $destinationX,
+            $destinationY,
+            0,
+            0,
+            $containWidth,
+            $containHeight,
+            $width,
+            $height
         );
     }
 
@@ -271,6 +311,8 @@ class Attachment extends Eloquent {
             0,
             0,
             0,
+            $newWidth,
+            $newHeight,
             $width,
             $height
         );
