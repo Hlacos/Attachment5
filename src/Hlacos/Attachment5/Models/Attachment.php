@@ -116,7 +116,7 @@ class Attachment extends Eloquent {
     public function removeFile() {
         unlink($this->publicPath());
 
-        if (count($this->sizes) {
+        if (count($this->sizes)) {
             foreach ($this->sizes as $size) {
                 unlink($this->publicPath($size));
             }
