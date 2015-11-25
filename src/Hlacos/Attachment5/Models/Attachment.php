@@ -43,17 +43,17 @@ class Attachment extends Eloquent {
                 return false;
             }
 
-            if (count($attachment->sizes)) {
-                foreach($attachment->sizes as $size) {
-                    $attachment->copySize($size);
-                }
-            }
+            $attachment->regenerate();
         });
 
         static::updating(function($attachment) {
             if ($attachment->path) {
                 return false;
             }
+        });
+
+        static::deleting(function($attachment) {
+            $attachment->removeFile();
         });
     }
 
@@ -71,8 +71,10 @@ class Attachment extends Eloquent {
     }
 
     public function regenerate() {
-        foreach ($this->sizes as $size) {
-            $this->copySize($size);
+        if (count($this->sizes)) {
+            foreach ($this->sizes as $size) {
+                $this->copySize($size);
+            }
         }
     }
 
@@ -109,6 +111,16 @@ class Attachment extends Eloquent {
         }
 
         return false;
+    }
+
+    public function removeFile() {
+        unlink($this->publicPath());
+
+        if (count($this->sizes) {
+            foreach ($this->sizes as $size) {
+                unlink($this->publicPath($size));
+            }
+        }
     }
 
     /**
