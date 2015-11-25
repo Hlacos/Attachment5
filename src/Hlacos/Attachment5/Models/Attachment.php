@@ -39,19 +39,19 @@ class Attachment extends Eloquent {
 
     public static function boot() {
         static::creating(function($attachment) {
-            if (!$this->path || !$this->moveFile($this->path)) {
+            if (!$attachment->path || !$attachment->moveFile($attachment->path)) {
                 return false;
             }
 
-            if (count($this->sizes)) {
-                foreach($this->sizes as $size) {
-                    $this->copySize($size);
+            if (count($attachment->sizes)) {
+                foreach($attachment->sizes as $size) {
+                    $attachment->copySize($size);
                 }
             }
         });
 
         static::updating(function($attachment) {
-            if ($this->path) {
+            if ($attachment->path) {
                 return false;
             }
         });
