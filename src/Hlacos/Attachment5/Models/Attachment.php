@@ -37,6 +37,26 @@ class Attachment extends Eloquent {
         return $this->morphTo();
     }
 
+    public static function boot() {
+        static::creating(function($attachment) {
+            if (!$this->path || !$this->moveFile($this->path)) {
+                return false;
+            }
+
+            if (count($this->sizes)) {
+                foreach($this->sizes as $size) {
+                    $this->copySize($size);
+                }
+            }
+        });
+
+        static::updating(function($attachment) {
+            if ($this->path) {
+                return false;
+            }
+        });
+    }
+
     /**
      * Saves the file.
      *
@@ -47,18 +67,13 @@ class Attachment extends Eloquent {
      * @return bool
      */
     public function save(array $options = array()) {
-        parent::save($options);
+        return parent::save($options);
+    }
 
-        if ($this->moveFile($this->path)) {
-            if (count($this->sizes)) {
-                foreach($this->sizes as $size) {
-                    $this->copySize($size);
-                }
-            }
-            return true;
+    public function regenerate() {
+        foreach ($this->sizes as $size) {
+            $this->copySize($size);
         }
-
-        return false;
     }
 
     /**
