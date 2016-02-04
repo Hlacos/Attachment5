@@ -106,7 +106,9 @@ class Attachment extends Eloquent {
         }
 
         if (copy($path, $this->publicPath())) {
-            unlink($path);
+	    if (file_exists($path)) {
+                unlink($path);
+            }
             return true;
         }
 
@@ -114,11 +116,15 @@ class Attachment extends Eloquent {
     }
 
     public function removeFile() {
-        unlink($this->publicPath());
+        if (file_exists($this->publicPath())) {
+            unlink($this->publicPath());
+        }
 
         if (count($this->sizes)) {
             foreach ($this->sizes as $size) {
-                unlink($this->publicPath($size));
+                if (file_exists($this->publicPath($size))) {
+                    unlink($this->publicPath($size));
+                }
             }
         }
     }
