@@ -187,15 +187,15 @@ class Attachment extends Eloquent {
         $transparent = imagecolorallocatealpha($thumb, 255, 255, 255, 127);
         imagefilledrectangle($thumb, 0, 0, $newWidth, $newHeight, $transparent);
 
-        if ($this->extension == 'jpg') {
+        if (strtolower($this->extension) == 'jpg') {
             $source = imagecreatefromjpeg($this->publicPath());
             imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
             imagejpeg($thumb, $this->publicPath($size));
-        } elseif ($this->extension == 'jpeg') {
+        } elseif (strtolower($this->extension) == 'jpeg') {
             $source = imagecreatefromjpeg($this->publicPath());
             imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
             imagejpeg($thumb, $this->publicPath($size));
-        } elseif ($this->extension == 'png') {
+        } elseif (strtolower($this->extension) == 'png') {
             $source = imagecreatefrompng($this->publicPath());
             imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
             imagepng($thumb, $this->publicPath($size));
