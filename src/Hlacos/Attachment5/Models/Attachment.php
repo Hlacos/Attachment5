@@ -199,6 +199,10 @@ class Attachment extends Eloquent {
             $source = imagecreatefrompng($this->publicPath());
             imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
             imagepng($thumb, $this->publicPath($size));
+        } elseif (strtolower($this->extension) == 'gif') {
+            $source = imagecreatefromgif($this->publicPath());
+            imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
+            imagegif($thumb, $this->publicPath($size));
         }
     }
 
