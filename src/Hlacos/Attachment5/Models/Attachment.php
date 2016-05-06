@@ -175,7 +175,8 @@ class Attachment extends Eloquent {
         return $this->filename.'.'.$this->extension;
     }
 
-    private function copySize($size) {
+    private function copySize($size)
+    {
         list($width, $height) = getimagesize($this->publicPath());
 
         list($newWidth, $newHeight, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight) = $this->calcSizes($size, $width, $height);
@@ -200,9 +201,28 @@ class Attachment extends Eloquent {
             imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
             imagepng($thumb, $this->publicPath($size));
         } elseif (strtolower($this->extension) == 'gif') {
-            $source = imagecreatefromgif($this->publicPath());
-            imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
-            imagegif($thumb, $this->publicPath($size));
+            if (extension_loaded('imagick')) {
+                $image = new \Imagick($this->publicPath());
+                $image = $image->coalesceimages();
+
+                $final = new \Imagick();
+
+                foreach ($image as $frame) {
+                    $canvas = new \Imagick();
+                    $canvas->newImage($newWidth, $newHeight, new \ImagickPixel('none'));
+                    $delay = $frame->getImageDelay();
+                    $canvas->setImageDelay($delay);
+
+                    $canvas->compositeImage($thumb, \Imagick::COMPOSITE_OVER, 0, 0);
+
+                    $final->addimage($canvas);
+                }
+                $final->writeImages($this->publicPath($size), true);
+            } else {
+                $source = imagecreatefromgif($this->publicPath());
+                imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
+                imagegif($thumb, $this->publicPath($size));
+            }
         }
     }
 
@@ -235,7 +255,6 @@ class Attachment extends Eloquent {
                 return $this->resizeBox($width, $height);
                 break;
         }
-
     }
 
     private function resizeWidth($width, $height, $newWidth) {
