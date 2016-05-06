@@ -204,16 +204,17 @@ class Attachment extends Eloquent {
             if (extension_loaded('imagick')) {
                 $image = new \Imagick($this->publicPath());
                 $image = $image->coalesceimages();
-
                 $final = new \Imagick();
 
                 foreach ($image as $frame) {
                     $canvas = new \Imagick();
+                    $frame->cropimage($sourceWidth, $sourceHeight, $sourceX, $sourceY);
+                    $frame->thumbnailImage($destinationWidth, $destinationHeight);
                     $canvas->newImage($newWidth, $newHeight, new \ImagickPixel('none'));
                     $delay = $frame->getImageDelay();
                     $canvas->setImageDelay($delay);
 
-                    $canvas->compositeImage($thumb, \Imagick::COMPOSITE_OVER, 0, 0);
+                    $canvas->compositeImage($frame, \Imagick::COMPOSITE_OVER, $destinationX, $destinationY);
 
                     $final->addimage($canvas);
                 }
