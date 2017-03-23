@@ -52,3 +52,7 @@ public function attachment() {
     return $this->morphMany('Hlacos\Attachment5\Models\Attachment', 'attachable');
 }
 </pre>
+
+# Contributions
+
+Thanks to David Beyaty (https://github.com/hatja) for the gif resize implementation.
