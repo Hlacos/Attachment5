@@ -5,8 +5,8 @@ namespace Hlacos\Attachment5\Models;
 use Illuminate\Database\Eloquent\Model as Eloquent;
 use Illuminate\Support\Facades\Config;
 
-class Attachment extends Eloquent {
-
+class Attachment extends Eloquent
+{
     /**
      * The database table used by the model.
      *
@@ -33,12 +33,15 @@ class Attachment extends Eloquent {
      *
      * @return \Illuminate\Database\Eloquent\Relations\MorphTo
      */
-    public function attachable() {
+    public function attachable()
+    {
         return $this->morphTo();
     }
 
-    public static function boot() {
-        static::created(function($attachment) {
+    public static function boot()
+    {
+        static::created(function ($attachment) {
+
             if (!$attachment->path || !$attachment->moveFile($attachment->path)) {
                 return false;
             }
@@ -46,14 +49,16 @@ class Attachment extends Eloquent {
             $attachment->regenerate();
         });
 
-        static::updating(function($attachment) {
+        static::updating(function ($attachment) {
             if ($attachment->path) {
                 return false;
             }
         });
 
-        static::deleting(function($attachment) {
-            $attachment->removeFile();
+        static::deleting(function ($attachment) {
+            if (!isset($attachment->forceDeleting) || (isset($attachment->forceDeleting) && $attachment->forceDeleting)) {
+                $attachment->removeFile();
+            }
         });
     }
 
@@ -66,11 +71,13 @@ class Attachment extends Eloquent {
      *
      * @return bool
      */
-    public function save(array $options = array()) {
+    public function save(array $options = array())
+    {
         return parent::save($options);
     }
 
-    public function regenerate() {
+    public function regenerate()
+    {
         if (count($this->sizes)) {
             foreach ($this->sizes as $size) {
                 $this->copySize($size);
@@ -85,7 +92,8 @@ class Attachment extends Eloquent {
      *
      * @return void
      */
-    public function addFile($path) {
+    public function addFile($path)
+    {
         $this->path = $path;
         $this->filename = pathinfo($path, PATHINFO_FILENAME);
         $this->extension = pathinfo($path, PATHINFO_EXTENSION);
@@ -100,13 +108,15 @@ class Attachment extends Eloquent {
      *
      * @return bool
      */
-    public function moveFile($path) {
+    public function moveFile($path)
+    {
         if (!file_exists(public_path().'/'.$this->basePath())) {
             mkdir(public_path().'/'.$this->basePath(), 0777, true);
         }
 
         if (copy($path, $this->publicPath())) {
-	    if (file_exists($path)) {
+            if (file_exists($path)) {
+
                 unlink($path);
             }
             return true;
@@ -115,7 +125,8 @@ class Attachment extends Eloquent {
         return false;
     }
 
-    public function removeFile() {
+    public function removeFile()
+    {
         if (file_exists($this->publicPath())) {
             unlink($this->publicPath());
         }
@@ -134,7 +145,8 @@ class Attachment extends Eloquent {
      *
      * @return string
      */
-    public function publicPath($size = null) {
+    public function publicPath($size = null)
+    {
         $publicPath = public_path().$this->publicFilename();
         if ($size) {
             return str_replace('.'.$this->extension, '_'.$size.'.'.$this->extension, $publicPath);
@@ -150,7 +162,8 @@ class Attachment extends Eloquent {
      *
      * @return string
      */
-    public function publicUrl($size = null) {
+    public function publicUrl($size = null)
+    {
         $publicUrl = asset($this->publicFilename());
 
         if ($size) {
@@ -160,18 +173,21 @@ class Attachment extends Eloquent {
         }
     }
 
-    private function basePath() {
+    private function basePath()
+    {
         //TODO: könyvtárszerkezetet módosítani, esetleg uuid-s megoldással.
         return '/'.config::get('attachment5.folder').'/'
             .self::sanitize($this->get_real_class(), true, true)
             .'/'.$this->id.'/';
     }
 
-    private function publicFilename() {
+    private function publicFilename()
+    {
         return $this->basePath().$this->baseFilename();
     }
 
-    private function baseFilename() {
+    private function baseFilename()
+    {
         return $this->filename.'.'.$this->extension;
     }
 
@@ -225,6 +241,160 @@ class Attachment extends Eloquent {
                 imagegif($thumb, $this->publicPath($size));
             }
         }
+    }
+
+    private function calcSizes($size, $width, $height)
+    {
+        switch ($size) {
+            case (preg_match('/^([0-9]*)w$/i', $size, $matches) ? true : false) :
+                $newWidth = $matches[1];
+                return $this->resizeWidth($width, $height, $newWidth);
+                break;
+            case (preg_match('/^([0-9]*)h$/i', $size, $matches) ? true : false) :
+                $newHeight = $matches[1];
+                return $this->resizeHeight($width, $height, $newHeight);
+                break;
+            case (preg_match('/^([0-9]*)x([0-9]*)b$/i', $size, $matches) ? true : false) :
+                $newWidth = $matches[1];
+                $newHeight= $matches[2];
+                return $this->resizeBox($width, $height, $newWidth, $newHeight);
+                break;
+            case (preg_match('/^([0-9]*)x([0-9]*)c$/i', $size, $matches) ? true : false) :
+                $newWidth = $matches[1];
+                $newHeight= $matches[2];
+                return $this->cropBox($width, $height, $newWidth, $newHeight);
+                break;
+            case (preg_match('/^([0-9]*)x([0-9]*)e$/i', $size, $matches) ? true : false) :
+                $newWidth = $matches[1];
+                $newHeight= $matches[2];
+                return $this->expandBox($width, $height, $newWidth, $newHeight);
+                break;
+            default:
+                return $this->resizeBox($width, $height);
+                break;
+        }
+    }
+
+    private function resizeWidth($width, $height, $newWidth)
+    {
+        $newHeight = round(($newWidth / $width) * $height);
+
+        return array(
+            $newWidth,
+            $newHeight,
+            0,
+            0,
+            0,
+            0,
+            $newWidth,
+            $newHeight,
+            $width,
+            $height
+        );
+    }
+
+    private function resizeHeight($width, $height, $newHeight)
+    {
+        $newWidth = round(($newHeight / $height) * $width);
+
+        return array(
+            $newWidth,
+            $newHeight,
+            0,
+            0,
+            0,
+            0,
+            $newWidth,
+            $newHeight,
+            $width,
+            $height
+        );
+    }
+
+    private function cropBox($width, $height, $newWidth, $newHeight)
+    {
+        if ($width / $height < $newWidth / $newHeight) {
+            $ratioHeight = round(($newWidth / $width) * $height);
+
+            $sourceX = 0;
+            $sourceY = round(($height - ($newHeight / ($newWidth / $width))) / 2);
+
+            $cropWidth = $width;
+            $cropHeight = round($newHeight / ($newWidth / $width));
+        } else {
+            $ratioWidth = round(($newHeight / $height) * $width);
+
+            $sourceX = round(($width - ($newWidth / ($newHeight / $height))) / 2);
+            $sourceY = 0;
+
+            $cropHeight = $height;
+            $cropWidth = round($newWidth / ($newHeight / $height));
+        }
+
+        return array(
+            $newWidth,
+            $newHeight,
+            0,
+            0,
+            $sourceX,
+            $sourceY,
+            $newWidth,
+            $newHeight,
+            $cropWidth,
+            $cropHeight
+        );
+    }
+
+    private function expandBox($width, $height, $newWidth, $newHeight)
+    {
+        if ($width / $height < $newWidth / $newHeight) {
+            $containWidth = round($width * ($newHeight / $height));
+            $containHeight = $newHeight;
+
+            $destinationX = round(($newWidth - $containWidth) / 2);
+            $destinationY = 0;
+        } else {
+            $containWidth = $newWidth;
+            $containHeight = round($height * ($newWidth / $width));
+
+            $destinationX = 0;
+            $destinationY = round(($newHeight - $containHeight) / 2);
+        }
+
+        return array(
+            $newWidth,
+            $newHeight,
+            $destinationX,
+            $destinationY,
+            0,
+            0,
+            $containWidth,
+            $containHeight,
+            $width,
+            $height
+        );
+    }
+
+    private function resizeBox($width, $height, $newWidth, $newHeight)
+    {
+        if ($width / $height >= $newWidth / $newHeight) {
+            $newHeight = round(($newWidth / $width) * $height);
+        } else {
+            $newWidth = round(($newHeight / $height) * $width);
+        }
+
+        return array(
+            $newWidth,
+            $newHeight,
+            0,
+            0,
+            0,
+            0,
+            $newWidth,
+            $newHeight,
+            $width,
+            $height
+        );
     }
 
     private function calcSizes($size, $width, $height) {
@@ -389,7 +559,8 @@ class Attachment extends Eloquent {
             $clean;
     }
 
-    private function get_real_class() {
+    private function get_real_class()
+    {
         $classname = get_class($this);
 
         if (preg_match('@\\\\([\w]+)$@', $classname, $matches)) {
