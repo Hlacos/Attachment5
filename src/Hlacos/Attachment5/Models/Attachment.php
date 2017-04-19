@@ -83,14 +83,14 @@ class Attachment extends Eloquent
 
     public function regenerate()
     {
-        if (count($this->sizes)) {
-            foreach ($this->sizes as $size) {
-                $this->copySize($size);
-            }
+        if ($this->originalMaxSize !== null) {
+            $this->copySize($this->originalMaxSize, $this->publicPath(), false);
         }
 
-        if ($this->originalMaxSize !== null) {
-            $this->resizeOriginal();
+        if (count($this->sizes)) {
+            foreach ($this->sizes as $size) {
+                $this->copySize($size, $this->publicPath($size), true);
+            }
         }
     }
 
@@ -199,12 +199,11 @@ class Attachment extends Eloquent
         return $this->filename.'.'.$this->extension;
     }
 
-    private function resizeOriginal()
+    private function copySize($size, $filePath, $increase)
     {
-        $size = $this->originalMaxSize;
         list($width, $height) = getimagesize($this->publicPath());
 
-        list($newWidth, $newHeight, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight) = $this->calcMaxSizes($size, $width, $height);
+        list($newWidth, $newHeight, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight) = $this->calcSizes($size, $width, $height, $increase);
 
         $thumb = imagecreatetruecolor($newWidth, $newHeight);
 
@@ -216,15 +215,15 @@ class Attachment extends Eloquent
         if (strtolower($this->extension) == 'jpg') {
             $source = imagecreatefromjpeg($this->publicPath());
             imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
-            imagejpeg($thumb, $this->publicPath());
+            imagejpeg($thumb, $filePath);
         } elseif (strtolower($this->extension) == 'jpeg') {
             $source = imagecreatefromjpeg($this->publicPath());
             imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
-            imagejpeg($thumb, $this->publicPath());
+            imagejpeg($thumb, $filePath);
         } elseif (strtolower($this->extension) == 'png') {
             $source = imagecreatefrompng($this->publicPath());
             imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
-            imagepng($thumb, $this->publicPath());
+            imagepng($thumb, $filePath);
         } elseif (strtolower($this->extension) == 'gif') {
             if (extension_loaded('imagick')) {
                 $image = new \Imagick($this->publicPath());
@@ -243,157 +242,64 @@ class Attachment extends Eloquent
 
                     $final->addimage($canvas);
                 }
-                $final->writeImages($this->publicPath(), true);
+                $final->writeImages($filePath, true);
             } else {
                 $source = imagecreatefromgif($this->publicPath());
                 imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
-                imagegif($thumb, $this->publicPath());
+                imagegif($thumb, $filePath);
             }
         }
     }
 
-    private function copySize($size)
-    {
-        list($width, $height) = getimagesize($this->publicPath());
-
-        list($newWidth, $newHeight, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight) = $this->calcSizes($size, $width, $height);
-
-        $thumb = imagecreatetruecolor($newWidth, $newHeight);
-
-        imagealphablending($thumb, false);
-        imagesavealpha($thumb, true);
-        $transparent = imagecolorallocatealpha($thumb, 255, 255, 255, 127);
-        imagefilledrectangle($thumb, 0, 0, $newWidth, $newHeight, $transparent);
-
-        if (strtolower($this->extension) == 'jpg') {
-            $source = imagecreatefromjpeg($this->publicPath());
-            imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
-            imagejpeg($thumb, $this->publicPath($size));
-        } elseif (strtolower($this->extension) == 'jpeg') {
-            $source = imagecreatefromjpeg($this->publicPath());
-            imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
-            imagejpeg($thumb, $this->publicPath($size));
-        } elseif (strtolower($this->extension) == 'png') {
-            $source = imagecreatefrompng($this->publicPath());
-            imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
-            imagepng($thumb, $this->publicPath($size));
-        } elseif (strtolower($this->extension) == 'gif') {
-            if (extension_loaded('imagick')) {
-                $image = new \Imagick($this->publicPath());
-                $image = $image->coalesceimages();
-                $final = new \Imagick();
-
-                foreach ($image as $frame) {
-                    $canvas = new \Imagick();
-                    $frame->cropimage($sourceWidth, $sourceHeight, $sourceX, $sourceY);
-                    $frame->thumbnailImage($destinationWidth, $destinationHeight);
-                    $canvas->newImage($newWidth, $newHeight, new \ImagickPixel('none'));
-                    $delay = $frame->getImageDelay();
-                    $canvas->setImageDelay($delay);
-
-                    $canvas->compositeImage($frame, \Imagick::COMPOSITE_OVER, $destinationX, $destinationY);
-
-                    $final->addimage($canvas);
-                }
-                $final->writeImages($this->publicPath($size), true);
-            } else {
-                $source = imagecreatefromgif($this->publicPath());
-                imagecopyresampled($thumb, $source, $destinationX, $destinationY, $sourceX, $sourceY, $destinationWidth, $destinationHeight, $sourceWidth, $sourceHeight);
-                imagegif($thumb, $this->publicPath($size));
-            }
-        }
-    }
-
-    private function calcSizes($size, $width, $height)
+    private function calcSizes($size, $width, $height, $increase)
     {
         switch ($size) {
             case (preg_match('/^([0-9]*)w$/i', $size, $matches) ? true : false):
                 $newWidth = $matches[1];
-                return $this->resizeWidth($width, $height, $newWidth);
+                return $this->resizeWidth($width, $height, $newWidth, $increase);
                 break;
             case (preg_match('/^([0-9]*)h$/i', $size, $matches) ? true : false):
                 $newHeight = $matches[1];
-                return $this->resizeHeight($width, $height, $newHeight);
+                return $this->resizeHeight($width, $height, $newHeight, $increase);
                 break;
             case (preg_match('/^([0-9]*)x([0-9]*)b$/i', $size, $matches) ? true : false):
                 $newWidth = $matches[1];
                 $newHeight= $matches[2];
-                return $this->resizeBox($width, $height, $newWidth, $newHeight);
+                return $this->resizeBox($width, $height, $newWidth, $newHeight, $increase);
                 break;
             case (preg_match('/^([0-9]*)x([0-9]*)c$/i', $size, $matches) ? true : false):
                 $newWidth = $matches[1];
                 $newHeight= $matches[2];
-                return $this->cropBox($width, $height, $newWidth, $newHeight);
+                return $this->cropBox($width, $height, $newWidth, $newHeight, $increase);
                 break;
             case (preg_match('/^([0-9]*)x([0-9]*)e$/i', $size, $matches) ? true : false):
                 $newWidth = $matches[1];
                 $newHeight= $matches[2];
-                return $this->expandBox($width, $height, $newWidth, $newHeight);
+                return $this->expandBox($width, $height, $newWidth, $newHeight, $increase);
                 break;
             default:
-                return $this->resizeBox($width, $height);
+                return $this->resizeBox($width, $height, $increase);
                 break;
         }
     }
 
-    private function calcMaxSizes($size, $width, $height)
+    private function resizeWidth($width, $height, $newWidth, $increase)
     {
-        switch ($size) {
-            case (preg_match('/^([0-9]*)w$/i', $size, $matches) ? true : false):
-                $newWidth = $matches[1];
-                if ($newWidth > $width) {
-                    $newWidth = $width;
-                }
-                return $this->resizeWidth($width, $height, $newWidth);
-                break;
-            case (preg_match('/^([0-9]*)h$/i', $size, $matches) ? true : false):
-                $newHeight = $matches[1];
-                if ($newHeight > $height) {
-                    $newHeight = $height;
-                }
-                return $this->resizeHeight($width, $height, $newHeight);
-                break;
-            case (preg_match('/^([0-9]*)x([0-9]*)b$/i', $size, $matches) ? true : false):
-                $newWidth = $matches[1];
-                $newHeight= $matches[2];
-                if ($newWidth > $width) {
-                    $newWidth = $width;
-                }
-                if ($newHeight > $height) {
-                    $newHeight = $height;
-                }
-                return $this->resizeBox($width, $height, $newWidth, $newHeight);
-                break;
-            case (preg_match('/^([0-9]*)x([0-9]*)c$/i', $size, $matches) ? true : false):
-                $newWidth = $matches[1];
-                $newHeight= $matches[2];
-                if ($newWidth > $width) {
-                    $newWidth = $width;
-                }
-                if ($newHeight > $height) {
-                    $newHeight = $height;
-                }
-                return $this->cropBox($width, $height, $newWidth, $newHeight);
-                break;
-            case (preg_match('/^([0-9]*)x([0-9]*)e$/i', $size, $matches) ? true : false):
-                $newWidth = $matches[1];
-                $newHeight= $matches[2];
-                if ($newWidth > $width) {
-                    $newWidth = $width;
-                }
-                if ($newHeight > $height) {
-                    $newHeight = $height;
-                }
-                return $this->expandBox($width, $height, $newWidth, $newHeight);
-                break;
-            default:
-                return $this->resizeBox($width, $height);
-                break;
+        if ($newWidth > $width && !$increase) {
+            return array(
+                $width,
+                $height,
+                0,
+                0,
+                0,
+                0,
+                $width,
+                $height,
+                $width,
+                $height
+            );
         }
-    }
 
-    private function resizeWidth($width, $height, $newWidth)
-    {
         $newHeight = round(($newWidth / $width) * $height);
 
         return array(
@@ -410,10 +316,24 @@ class Attachment extends Eloquent
         );
     }
 
-    private function resizeHeight($width, $height, $newHeight)
+    private function resizeHeight($width, $height, $newHeight, $increase)
     {
-        $newWidth = round(($newHeight / $height) * $width);
+        if ($newHeight > $height && !$increase) {
+            return array(
+                $width,
+                $height,
+                0,
+                0,
+                0,
+                0,
+                $width,
+                $height,
+                $width,
+                $height
+            );
+        }
 
+        $newWidth = round(($newHeight / $height) * $width);
         return array(
             $newWidth,
             $newHeight,
@@ -428,8 +348,22 @@ class Attachment extends Eloquent
         );
     }
 
-    private function cropBox($width, $height, $newWidth, $newHeight)
+    private function cropBox($width, $height, $newWidth, $newHeight, $increase)
     {
+        if ($newWidth > $width && $newHeight > $height && !$increase) {
+            return array(
+                $width,
+                $height,
+                0,
+                0,
+                0,
+                0,
+                $width,
+                $height,
+                $width,
+                $height
+            );
+        }
         if ($width / $height < $newWidth / $newHeight) {
             $ratioHeight = round(($newWidth / $width) * $height);
 
@@ -462,8 +396,23 @@ class Attachment extends Eloquent
         );
     }
 
-    private function expandBox($width, $height, $newWidth, $newHeight)
+    private function expandBox($width, $height, $newWidth, $newHeight, $increase)
     {
+        if ($newWidth > $width && $newHeight > $height && !$increase) {
+            return array(
+                $width,
+                $height,
+                0,
+                0,
+                0,
+                0,
+                $width,
+                $height,
+                $width,
+                $height
+            );
+        }
+
         if ($width / $height < $newWidth / $newHeight) {
             $containWidth = round($width * ($newHeight / $height));
             $containHeight = $newHeight;
@@ -492,8 +441,22 @@ class Attachment extends Eloquent
         );
     }
 
-    private function resizeBox($width, $height, $newWidth, $newHeight)
+    private function resizeBox($width, $height, $newWidth, $newHeight, $increase)
     {
+        if ($newWidth > $width && $newHeight > $height && !$increase) {
+            return array(
+                $width,
+                $height,
+                0,
+                0,
+                0,
+                0,
+                $width,
+                $height,
+                $width,
+                $height
+            );
+        }
         if ($width / $height >= $newWidth / $newHeight) {
             $newHeight = round(($newWidth / $width) * $height);
         } else {
