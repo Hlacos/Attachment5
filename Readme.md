@@ -37,6 +37,10 @@ Extend Hlacos\Attachment5\Models\Attachment and set the $table attribute.
 Extend Hlacos\Attachment5\Models\Attachment and set the $sizes array attribute.
 In the array sets the width of the required images;
 
+## Set max size of the original image
+
+Extend Hlacos\Attachment5\Models\Attachment and set the $originalMaxSize string attribute.
+
 # Related models
 
 You can set polymoprhic relations in the realted models.
