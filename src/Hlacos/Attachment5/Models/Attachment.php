@@ -181,7 +181,33 @@ class Attachment extends Eloquent
         }
     }
 
-    private function basePath()
+    public static function sanitize($string, $forceLowercase = false, $alpha = false)
+    {
+        $strip = array("~", "`", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "=", "+", "[", "{", "]",
+            "}", "\\", "|", ";", ":", "\"", "'", "&#8216;", "&#8217;", "&#8220;", "&#8221;", "&#8211;", "&#8212;",
+            "â€”", "â€“", ",", "<", ".", ">", "/", "?");
+        $clean = trim(str_replace($strip, "", strip_tags($string)));
+        $clean = preg_replace('/\s+/', "-", $clean);
+        $clean = ($alpha) ? preg_replace("/[^a-zA-Z0-9]/", "", $clean) : $clean ;
+        return ($forceLowercase) ?
+            (function_exists('mb_strtolower')) ?
+                mb_strtolower($clean, 'UTF-8') :
+                strtolower($clean) :
+            $clean;
+    }
+
+    protected function get_real_class()
+    {
+        $classname = get_class($this);
+
+        if (preg_match('@\\\\([\w]+)$@', $classname, $matches)) {
+            $classname = $matches[1];
+        }
+
+        return $classname;
+    }
+
+    protected function basePath()
     {
         //TODO: könyvtárszerkezetet módosítani, esetleg uuid-s megoldással.
         return '/'.config('attachment5.folder').'/'
@@ -189,12 +215,12 @@ class Attachment extends Eloquent
             .'/'.$this->id.'/';
     }
 
-    private function publicFilename()
+    protected function publicFilename()
     {
         return $this->basePath().$this->baseFilename();
     }
 
-    private function baseFilename()
+    protected function baseFilename()
     {
         return $this->filename.'.'.$this->extension;
     }
@@ -475,31 +501,5 @@ class Attachment extends Eloquent
             $width,
             $height
         );
-    }
-
-    public static function sanitize($string, $forceLowercase = false, $alpha = false)
-    {
-        $strip = array("~", "`", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "=", "+", "[", "{", "]",
-            "}", "\\", "|", ";", ":", "\"", "'", "&#8216;", "&#8217;", "&#8220;", "&#8221;", "&#8211;", "&#8212;",
-            "â€”", "â€“", ",", "<", ".", ">", "/", "?");
-        $clean = trim(str_replace($strip, "", strip_tags($string)));
-        $clean = preg_replace('/\s+/', "-", $clean);
-        $clean = ($alpha) ? preg_replace("/[^a-zA-Z0-9]/", "", $clean) : $clean ;
-        return ($forceLowercase) ?
-            (function_exists('mb_strtolower')) ?
-                mb_strtolower($clean, 'UTF-8') :
-                strtolower($clean) :
-            $clean;
-    }
-
-    private function get_real_class()
-    {
-        $classname = get_class($this);
-
-        if (preg_match('@\\\\([\w]+)$@', $classname, $matches)) {
-            $classname = $matches[1];
-        }
-
-        return $classname;
     }
 }
