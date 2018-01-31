@@ -20,7 +20,7 @@ class Attachment extends Eloquent
      *
      * @var array $sizes
      */
-    protected $sizes;
+    protected $sizes = [];
 
     /**
      * Resizes the original image if its bigger.
