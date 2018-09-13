@@ -37,6 +37,12 @@ class Attachment extends Eloquent
     public $path;
 
     /**
+     * Set keep the source file or not
+     * @var bool
+     */
+    protected $keepSource = false;
+
+    /**
      * Defines polymorphic relations to any other Model.
      *
      * @return \Illuminate\Database\Eloquent\Relations\MorphTo
@@ -65,6 +71,15 @@ class Attachment extends Eloquent
         static::deleting(function ($attachment) {
             $attachment->removeFile();
         });
+    }
+
+    /**
+     * Keep source setter
+     * @param bool $keep
+     */
+    public function keepSource($keep = true)
+    {
+        $this->keepSource = $keep;
     }
 
     /**
@@ -119,12 +134,12 @@ class Attachment extends Eloquent
      */
     public function moveFile($path)
     {
-        if (!file_exists(public_path().'/'.$this->basePath())) {
-            mkdir(public_path().'/'.$this->basePath(), 0777, true);
+        if (!file_exists(public_path() . '/' . $this->basePath())) {
+            mkdir(public_path() . '/' . $this->basePath(), 0777, true);
         }
 
         if (copy($path, $this->publicPath())) {
-            if (file_exists($path)) {
+            if (!$this->keepSource && file_exists($path)) {
                 unlink($path);
             }
             return true;
@@ -155,9 +170,9 @@ class Attachment extends Eloquent
      */
     public function publicPath($size = null)
     {
-        $publicPath = public_path().$this->publicFilename();
+        $publicPath = public_path() . $this->publicFilename();
         if ($size) {
-            return str_replace('.'.$this->extension, '_'.$size.'.'.$this->extension, $publicPath);
+            return str_replace('.' . $this->extension, '_' . $size . '.' . $this->extension, $publicPath);
         } else {
             return $publicPath;
         }
@@ -175,7 +190,7 @@ class Attachment extends Eloquent
         $publicUrl = asset($this->publicFilename());
 
         if ($size) {
-            return str_replace('.'.$this->extension, '_'.$size.'.'.$this->extension, $publicUrl);
+            return str_replace('.' . $this->extension, '_' . $size . '.' . $this->extension, $publicUrl);
         } else {
             return $publicUrl;
         }
@@ -188,7 +203,7 @@ class Attachment extends Eloquent
             "â€”", "â€“", ",", "<", ".", ">", "/", "?");
         $clean = trim(str_replace($strip, "", strip_tags($string)));
         $clean = preg_replace('/\s+/', "-", $clean);
-        $clean = ($alpha) ? preg_replace("/[^a-zA-Z0-9]/", "", $clean) : $clean ;
+        $clean = ($alpha) ? preg_replace("/[^a-zA-Z0-9]/", "", $clean) : $clean;
         return ($forceLowercase) ?
             (function_exists('mb_strtolower')) ?
                 mb_strtolower($clean, 'UTF-8') :
@@ -210,19 +225,19 @@ class Attachment extends Eloquent
     protected function basePath()
     {
         //TODO: könyvtárszerkezetet módosítani, esetleg uuid-s megoldással.
-        return '/'.config('attachment5.folder').'/'
-            .self::sanitize($this->get_real_class(), true, true)
-            .'/'.$this->id.'/';
+        return '/' . config('attachment5.folder') . '/'
+            . self::sanitize($this->get_real_class(), true, true)
+            . '/' . $this->id . '/';
     }
 
     protected function publicFilename()
     {
-        return $this->basePath().$this->baseFilename();
+        return $this->basePath() . $this->baseFilename();
     }
 
     protected function baseFilename()
     {
-        return $this->filename.'.'.$this->extension;
+        return $this->filename . '.' . $this->extension;
     }
 
     private function copySize($size, $filePath, $increase)
@@ -290,17 +305,17 @@ class Attachment extends Eloquent
                 break;
             case (preg_match('/^([0-9]*)x([0-9]*)b$/i', $size, $matches) ? true : false):
                 $newWidth = $matches[1];
-                $newHeight= $matches[2];
+                $newHeight = $matches[2];
                 return $this->resizeBox($width, $height, $newWidth, $newHeight, $increase);
                 break;
             case (preg_match('/^([0-9]*)x([0-9]*)c$/i', $size, $matches) ? true : false):
                 $newWidth = $matches[1];
-                $newHeight= $matches[2];
+                $newHeight = $matches[2];
                 return $this->cropBox($width, $height, $newWidth, $newHeight, $increase);
                 break;
             case (preg_match('/^([0-9]*)x([0-9]*)e$/i', $size, $matches) ? true : false):
                 $newWidth = $matches[1];
-                $newHeight= $matches[2];
+                $newHeight = $matches[2];
                 return $this->expandBox($width, $height, $newWidth, $newHeight, $increase);
                 break;
             default:
