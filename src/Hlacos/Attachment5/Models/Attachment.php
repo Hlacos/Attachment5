@@ -54,6 +54,7 @@ class Attachment extends Eloquent
 
     public static function boot()
     {
+      parent::boot();
         static::created(function ($attachment) {
             if (!$attachment->path || !$attachment->moveFile($attachment->path)) {
                 return false;
